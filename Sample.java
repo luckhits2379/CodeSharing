@@ -6,7 +6,7 @@ import org.powermock.modules.junit5.PowerMockExtension;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(PowerMockExtension.class) // PowerMockExtension for JUnit 5
-public class PowerMockitoTest {
+public class PowerMockitoTest { // test
 
     @Test
     void testMockStaticMethod() {
