@@ -1,0 +1,15 @@
+CREATE OR REPLACE PROCEDURE drop_all_tables_and_views IS
+BEGIN
+    -- Drop all views
+    FOR v IN (SELECT view_name FROM user_views) LOOP
+        EXECUTE IMMEDIATE 'DROP VIEW ' || v.view_name;
+    END LOOP;
+
+    -- Drop all tables
+    FOR t IN (SELECT table_name FROM user_tables) LOOP
+        EXECUTE IMMEDIATE 'DROP TABLE ' || t.table_name || ' CASCADE CONSTRAINTS';
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('All tables and views have been dropped.');
+END;
+/
