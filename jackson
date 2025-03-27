@@ -8,13 +8,15 @@ import java.io.IOException;
 public class GlobalValidationModifier extends BeanDeserializerModifier {
 
     @Override
-    public JsonDeserializer<?> modifyDeserializer(DeserializationConfig config,
-                                                  JavaType type,
-                                                  BeanDescription beanDesc,
-                                                  JsonDeserializer<?> deserializer) {
-        return new StdDeserializer<Object>(type) {
+    public JsonDeserializer<?> modifyDeserializer(
+            DeserializationConfig config,
+            BeanDescription beanDesc,
+            JsonDeserializer<?> deserializer) {
+        
+        return new JsonDeserializer<Object>() {
             @Override
             public Object deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                // Deserialize the object first
                 Object obj = deserializer.deserialize(p, ctxt);
 
                 // Perform global validation after deserialization
@@ -27,12 +29,6 @@ public class GlobalValidationModifier extends BeanDeserializerModifier {
 
     private void validateObject(Object obj) {
         System.out.println("Validating object: " + obj);
-        // Implement your global validation logic here
+        // Implement your validation logic here
     }
 }
-
-// Register with ObjectMapper
-ObjectMapper objectMapper = new ObjectMapper();
-SimpleModule module = new SimpleModule();
-module.setDeserializerModifier(new GlobalValidationModifier());
-objectMapper.registerModule(module);
