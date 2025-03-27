@@ -1,0 +1,35 @@
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+
+public class GlobalValidationModifier extends BeanDeserializerModifier {
+
+    @Override
+    public JsonDeserializer<?> modifyDeserializer(DeserializationConfig config, 
+                                                  com.fasterxml.jackson.databind.JavaType type, 
+                                                  BeanDescription beanDesc, 
+                                                  JsonDeserializer<?> deserializer) {
+        return new JsonDeserializer<Object>() {
+            @Override
+            public Object deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                Object obj = deserializer.deserialize(p, ctxt);
+
+                // Perform global validation after deserialization
+                validateObject(obj);
+                
+                return obj;
+            }
+        };
+    }
+
+    private void validateObject(Object obj) {
+        System.out.println("Validating object: " + obj);
+        // Implement validation logic here
+    }
+}
+
+// Register with ObjectMapper
+ObjectMapper objectMapper = new ObjectMapper();
+SimpleModule module = new SimpleModule();
+module.setDeserializerModifier(new GlobalValidationModifier());
+objectMapper.registerModule(module);
