@@ -35,6 +35,12 @@ public class JacksonConfig {
     public Module strictBigDecimalModule() {
         SimpleModule module = new SimpleModule();
         module.addDeserializer(BigDecimal.class, new StrictBigDecimalDeserializer());
-        return module;
-    }
-}
+        return 
+
+
+mapper.enable(JsonParser.Feature.ALLOW_NON_NUMERIC_NUMBERS);
+        mapper.enable(JsonParser.Feature.USE_BIG_DECIMAL_FOR_FLOATS)
+
+
+
+
