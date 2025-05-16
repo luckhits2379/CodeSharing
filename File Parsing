@@ -1,0 +1,152 @@
+Here’s a clear, structured technical story for the Recon File Parsing requirement that you can post on GitLab. It’s written for a junior developer and outlines the goal, technical details, and step-by-step tasks needed to implement the solution in Spring Boot, following clean architecture practices.
+
+⸻
+
+[Story] Recon File Parser Service
+
+Objective
+
+Implement a Recon File Parser that can parse reconciliation files in various formats (CSV, XLSX, TXT) with different delimiters (,, |, -, etc.), headers (present or absent), and hash/footer rows. Each file is bank-specific and may have a different structure. The parsed data should be transformed into a common format based on configuration stored in the database and persisted accordingly.
+
+⸻
+
+Background
+
+Banks send recon files in different formats. To normalize and process these files reliably:
+	•	We store file-specific configuration in a table.
+	•	This configuration includes:
+	•	Whether the file has a header or not
+	•	Delimiter type (e.g. comma, pipe)
+	•	Row number where actual data starts
+	•	Header-to-standard field mapping
+	•	Hash row location (optional)
+
+The goal is to write a config-driven parser that reads the configuration, parses the file, and returns data in a uniform structure ready for database storage.
+
+⸻
+
+File Scenarios to Handle
+	1.	CSV, XLSX, TXT formats
+	2.	Delimiters: ,, |, -, etc.
+	3.	Header:
+	•	Present with bank-specific column names
+	•	Absent (header mapping provided in config)
+	4.	Files may include a hash/footer row
+	5.	Rows may start from configurable row number (e.g., 2nd row or 5th row)
+	6.	Column sequence is not guaranteed
+
+⸻
+
+Expected Outcome
+	•	A Parser Service that takes a file and config, and returns a List<ReconData> (common DTO).
+	•	Recon data should be ready to be persisted using a repository.
+
+⸻
+
+Technical Design
+
+Entities/Models
+	•	FileConfig (mapped from DB):
+	•	bankCode
+	•	fileType (CSV, XLSX, TXT)
+	•	delimiter
+	•	headerPresent: boolean
+	•	headerRowNum: int
+	•	dataStartRow: int
+	•	hashRowNum: int (nullable)
+	•	headerMapping: Map<String, String> (bankField → standardField)
+	•	ReconData: POJO with standardized fields (like txnId, amount, timestamp, etc.)
+
+⸻
+
+Components to Implement
+
+1. ParserService
+	•	Method: List<ReconData> parse(MultipartFile file, FileConfig config)
+	•	Uses Apache POI for XLSX, OpenCSV or standard Java for CSV/TXT.
+	•	Reads config and maps file content to ReconData.
+
+2. FileConfigRepository
+	•	Fetch file configuration from DB by bankCode or fileId.
+
+3. ReconDataRepository
+	•	Persist parsed data in DB.
+
+4. ParserUtil
+	•	Helper functions to:
+	•	Detect and apply delimiter
+	•	Convert header row to standard fields
+	•	Skip or validate hash rows
+	•	Handle missing headers
+
+⸻
+
+Task Breakdown
+
+Step 1: Define FileConfig entity & repository
+	•	JPA Entity for file config table
+	•	Repository to query by bankCode
+
+Step 2: Define ReconData DTO
+	•	Common POJO for storing normalized data
+
+Step 3: Implement ParserService
+	•	Accepts a MultipartFile and a FileConfig
+	•	Detect file type
+	•	Delegate to specialized parser:
+	•	CsvParser
+	•	XlsxParser
+	•	TxtParser
+	•	Each parser:
+	•	Applies delimiter
+	•	Reads headers (or generates if missing)
+	•	Maps headers to standard fields using config
+	•	Skips/validates hash row if configured
+	•	Creates ReconData objects
+
+Step 4: Implement ReconDataRepository
+	•	Save list of ReconData to DB
+
+⸻
+
+Acceptance Criteria
+	•	Able to parse at least 3 banks’ files with different headers and structure
+	•	Support CSV and XLSX at minimum
+	•	Parser skips hash row if present
+	•	Returns list of mapped ReconData objects
+	•	Handles missing headers correctly
+	•	Clean exception handling with meaningful logs
+
+⸻
+
+Sample Config Example
+
+{
+  "bankCode": "HDFC",
+  "fileType": "CSV",
+  "delimiter": ",",
+  "headerPresent": true,
+  "headerRowNum": 0,
+  "dataStartRow": 1,
+  "hashRowNum": null,
+  "headerMapping": {
+    "Txn ID": "transactionId",
+    "Amount Paid": "amount",
+    "Date": "timestamp"
+  }
+}
+
+
+
+⸻
+
+Tech Stack Recommendations
+	•	Spring Boot
+	•	Apache POI for .xlsx
+	•	OpenCSV for .csv
+	•	Lombok for model boilerplate
+	•	JPA for config and recon data persistence
+
+⸻
+
+Let me know if you want this story broken down into subtasks or a diagram added. I can also generate template code for any component.
