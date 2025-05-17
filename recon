@@ -1,0 +1,273 @@
+story-1
+
+Here’s a detailed GitLab user story for the reconciliation task using Apache Spark, suitable for a junior developer:
+
+⸻
+
+📘 User Story: Reconciliation of order_payment and recon_file_dtls using Apache Spark
+
+⸻
+
+Title
+
+Develop Spark Job for Reconciling System Payment Data with Bank Data
+
+⸻
+
+Story Description
+
+As a part of the SBI ePay Reconciliation System, we need to reconcile payment data between our internal system (order_payment table) and normalized bank data (recon_file_dtls table). The reconciliation must identify:
+	•	Matched records
+	•	Unmatched records with reasons
+	•	Duplicate entries
+
+We expect to process 100 million records within 15 minutes. Hence, Apache Spark will be used for distributed processing. Optionally, Kafka can be considered for streaming data ingestion if future requirements evolve.
+
+⸻
+
+🎯 Acceptance Criteria
+	1.	Spark job reads both tables (order_payment, recon_file_dtls) from the database or HDFS/S3.
+	2.	Perform join based on the following fields:
+	•	atrnNum
+	•	paymentDate
+	•	paymentAmount
+	•	bankRefNum
+	•	paymentStatus
+	3.	Classify records into:
+	•	✅ Matched records — all fields match.
+	•	❌ Unmatched records — at least one field doesn’t match. Reason must be captured (e.g., Amount Mismatch, Missing in System, Status Mismatch, etc.).
+	•	🔁 Duplicate records — more than one entry in either table with the same atrnNum or other key fields.
+	4.	Output results to:
+	•	A parquet or CSV file with record classification and mismatch reason.
+	•	Optionally insert results into a new table (e.g., reconciliation_result) with schema:
+
+atrnNum VARCHAR
+matchStatus ENUM('MATCHED', 'UNMATCHED', 'DUPLICATE')
+mismatchReason TEXT
+sourceRecord JSON
+reconRecord JSON
+reconciledAt TIMESTAMP
+
+
+	5.	Ensure Spark job finishes within the 15-minute SLA on a dataset of 100M records.
+	6.	Write unit and integration tests to validate correctness.
+
+⸻
+
+🛠️ Technical Approach
+
+Input
+	•	Source: JDBC (PostgreSQL/Oracle/MySQL) or Parquet files extracted from:
+	•	order_payment
+	•	recon_file_dtls
+
+Processing
+	•	Load data using Spark SQL/DataFrame API.
+	•	Use a broadcast join or repartition based on dataset size and Spark cluster resources.
+	•	Compare each record field-by-field.
+	•	Generate a result DataFrame with classification and mismatch reason.
+
+Output
+	•	Store result in a directory structure:
+/recon_output/YYYY-MM-DD/HH-MM/
+containing: matched.parquet, unmatched.parquet, duplicates.parquet
+	•	Optionally write results to a Kafka topic (if real-time view is needed later).
+
+⸻
+
+📁 Directory Structure Suggestion
+
+reconciliation/
+├── src/
+│   ├── main/
+│   │   └── scala/com/example/recon/
+│   │       ├── ReconJob.scala
+│   │       ├── MatchEvaluator.scala
+│   │       └── Utils.scala
+├── resources/
+│   └── application.conf
+├── test/
+│   └── scala/com/example/recon/
+│       ├── ReconJobTest.scala
+│       └── MatchEvaluatorTest.scala
+
+
+⸻
+
+🧠 Suggestions for Junior Developer
+	•	Use Spark 3.x with Scala or PySpark.
+	•	Use Dataset[Row] for flexibility in dynamic schemas.
+	•	Use .join() for matching and .except() or .filter() for unmatched logic.
+	•	Create helper functions for mismatch reason detection.
+
+⸻
+
+✅ Deliverables
+	•	Spark job code in Git repo
+	•	Configuration file for database connectivity
+	•	Sample test data files (CSV/Parquet)
+	•	Scripts or docs to run the job on local and cluster mode
+	•	Unit tests with sample data
+	•	Performance test report with dataset > 10M rows
+
+⸻
+
+Would you like me to generate a working ReconJob.scala template and test data scaffold next?
+
+Story- 2
+
+Here’s the updated GitLab Story tailored for a Spring Boot application using Oracle Database and Apache Spark for reconciling large datasets. This story is structured for a junior developer to understand, implement, and deliver.
+
+⸻
+
+📘 User Story: Reconciliation of order_payment and recon_file_dtls using Apache Spark in Spring Boot
+
+⸻
+
+Title
+
+Build a Spring Boot Service to Reconcile System Payment Data with Bank Reconciliation Data Using Apache Spark
+
+⸻
+
+Story Description
+
+To ensure accuracy and auditability of the payment system, we need to build a Spring Boot microservice that reconciles data between:
+	•	order_payment table (system data)
+	•	recon_file_dtls table (data from parsed bank files)
+
+This service should:
+	•	Detect and report matched, unmatched, and duplicate records.
+	•	Be capable of reconciling up to 100 million records within 15 minutes using Apache Spark.
+	•	Use Oracle Database as the source for both datasets.
+	•	Optionally publish reconciliation results or events to Kafka (if enabled).
+
+⸻
+
+🎯 Acceptance Criteria
+	1.	Spring Boot app exposes a REST endpoint:
+POST /reconcile/{batchDate}
+	•	Input: batchDate in YYYY-MM-DD format.
+	•	Output: JSON response with reconciliation summary.
+	2.	Reconcile records based on the following fields:
+	•	atrnNum
+	•	paymentDate
+	•	paymentAmount
+	•	bankRefNum
+	•	paymentStatus
+	3.	Classification of records:
+	•	✅ MATCHED — all fields match.
+	•	❌ UNMATCHED — at least one field mismatches, with a reason.
+	•	🔁 DUPLICATE — more than one entry in either table with same key (e.g., atrnNum).
+	4.	Store reconciliation result in a new table:
+
+CREATE TABLE reconciliation_result (
+  id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  atrn_num VARCHAR2(64),
+  match_status VARCHAR2(32),
+  mismatch_reason CLOB,
+  source_json CLOB,
+  recon_json CLOB,
+  reconciled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  batch_date DATE
+);
+
+
+	5.	Ensure Spark job completes within SLA (15 min for 100M records).
+	6.	Write unit tests for Spark transformation logic.
+
+⸻
+
+🛠️ Technical Implementation Plan
+
+Spring Boot
+	•	Spring Web + Spring Data JPA + Spark Integration (via REST endpoint).
+	•	Spark job executed from service layer using SparkSession.
+
+Oracle Database
+	•	Use Spring Data JPA or JDBC to connect and extract data to Parquet/CSV (if required).
+	•	Ensure appropriate indexing on reconciliation fields.
+
+Apache Spark
+	•	Use DataFrame API to load both datasets via JDBC.
+	•	Join and compare records using Spark transformations.
+	•	Generate output: Matched, Unmatched (with reasons), and Duplicates.
+	•	Write results into reconciliation_result table.
+
+Optional Kafka
+	•	Send reconciliation summary/result events to Kafka topic (recon.result.event).
+
+⸻
+
+🧱 Suggested Directory Structure
+
+recon-service/
+├── src/main/java/com/example/recon/
+│   ├── controller/
+│   │   └── ReconciliationController.java
+│   ├── service/
+│   │   ├── ReconService.java
+│   │   └── ReconServiceImpl.java
+│   ├── spark/
+│   │   └── SparkReconciler.java
+│   ├── entity/
+│   │   ├── OrderPayment.java
+│   │   ├── ReconFileDtls.java
+│   │   └── ReconciliationResult.java
+│   ├── repository/
+│   │   └── ReconciliationResultRepository.java
+│   └── dto/
+│       └── ReconSummaryResponse.java
+├── src/main/resources/
+│   └── application.yml
+└── test/
+    └── java/com/example/recon/
+        └── ReconServiceTest.java
+
+
+⸻
+
+🔍 Implementation Steps (for Developer)
+	1.	Entities: Define JPA entities for order_payment, recon_file_dtls, and reconciliation_result.
+	2.	Controller: Expose /reconcile/{batchDate} endpoint.
+	3.	Service:
+	•	Load data using SparkSession.read().format("jdbc").
+	•	Perform reconciliation using Spark transformations.
+	•	For unmatched records, generate reasons (e.g., “Amount mismatch”).
+	•	Save all results to reconciliation_result table.
+	4.	Result DTO: Return a response like:
+
+{
+  "matched": 88563421,
+  "unmatched": 2123456,
+  "duplicates": 34567,
+  "duration": "11m 42s"
+}
+
+
+	5.	Tests: Use mock data to validate reconciliation logic.
+
+⸻
+
+📊 Reconciliation Logic Sample (Spark)
+
+val joinedDF = orderDF.join(reconDF, Seq("atrnNum"), "outer")
+  .withColumn("match_status", when(allFieldsMatch, "MATCHED")
+  .when(dupCheckCondition, "DUPLICATE")
+  .otherwise("UNMATCHED"))
+  .withColumn("mismatch_reason", generateMismatchReasonUDF(...))
+
+
+⸻
+
+🚀 Deliverables
+	•	Spring Boot application with REST endpoint.
+	•	Apache Spark integration with Oracle JDBC.
+	•	Entity classes and repository setup.
+	•	Working reconciliation logic and result storage.
+	•	Sample input/output files.
+	•	Integration + Unit Tests.
+
+⸻
+
+Would you like me to generate a sample implementation skeleton (ReconServiceImpl, SparkReconciler, etc.) and zip it for development kickstart?
