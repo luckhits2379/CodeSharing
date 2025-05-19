@@ -1,0 +1,63 @@
+Here’s a clear and structured GitLab story you can assign to junior developers. It’s broken down into story description, acceptance criteria, and development tasks to make the implementation clear and manageable.
+
+⸻
+
+🔖 Story Title: Implement Reconciliation Result Processor
+
+🧾 Story Description:
+
+As part of the reconciliation process, implement a service that reads records from the reconciliation_result table and performs the following actions based on the match_status:
+
+✅ Matched Records:
+	•	Publish the atrn to Kafka.
+	•	Transaction Service will consume the message and:
+	•	If transaction status is failed:
+	•	Check for DVP rule.
+	•	If DVP = true → mark transaction as failed and initiate refund.
+	•	If DVP = false or not set → update transaction status to success.
+	•	If transaction status is not failed, just update it to reconciled.
+
+❌ Unmatched Records:
+	•	Flag the record as a bad record in the recon_summary_dtls table.
+
+🔁 Duplicate Records:
+	•	Publish the atrn to Kafka.
+	•	Transaction Service will:
+	•	Insert duplicate record details into a new table merchant_order_dup_payment.
+	•	Initiate a refund for each duplicate record.
+
+⸻
+
+✅ Acceptance Criteria:
+	•	All records with match_status = 'matched' are published to Kafka.
+	•	Failed transactions follow the DVP rule logic and update status accordingly.
+	•	Unmatched records are flagged correctly in recon_summary_dtls.
+	•	Duplicate records are published to Kafka, consumed, stored in merchant_order_dup_payment, and refunded.
+	•	Proper logging and error handling is implemented.
+
+⸻
+
+🧩 Development Tasks:
+	1.	Kafka Setup:
+	•	Create a Kafka producer to publish atrn for matched and duplicate records.
+	•	Define Kafka topics for matched-atrn and duplicate-atrn.
+	2.	Reader Logic:
+	•	Implement a Spark/Batch job or service that reads from reconciliation_result table.
+	3.	Processing Logic:
+	•	For matched records:
+	•	Publish atrn to Kafka.
+	•	Ensure transaction service updates status based on transaction status and DVP rule.
+	•	For unmatched records:
+	•	Update corresponding entry in recon_summary_dtls as a bad record.
+	•	For duplicate records:
+	•	Publish atrn to Kafka.
+	•	Transaction service should insert into merchant_order_dup_payment and initiate refund.
+	4.	Unit & Integration Tests:
+	•	Write tests for each match_status scenario.
+	•	Validate Kafka message structure and processing.
+	5.	Documentation:
+	•	Document the service behavior, table updates, and Kafka message format.
+
+⸻
+
+Would you like me to generate sample Kafka message structures or a basic Java/Spring Boot code template for this logic?
