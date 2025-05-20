@@ -1,0 +1,146 @@
+Here’s a detailed GitLab story for a junior developer to implement the described functionality. You can break this into subtasks if you’re using GitLab Epics or Issues with child tasks.
+
+⸻
+
+GitLab Story: Implement SFTP File Ingestion and Acknowledgment Scheduler
+
+Summary
+
+Develop a Spring Boot scheduled job to:
+	1.	Connect to an SFTP path (/bankcode/paymodecode/date/in).
+	2.	Download and copy all files to S3.
+	3.	Insert metadata into recon_file_summary.
+	4.	Publish the recon_file_summary_id to Kafka.
+	5.	Generate acknowledgment files to /bankcode/paymodecode/date/out.
+	6.	Delete files from the SFTP input path after successful upload and acknowledgment.
+
+⸻
+
+Goal
+
+Enable automated ingestion of reconciliation files from the bank via SFTP, store them in S3, track metadata in DB, and trigger parsing via Kafka.
+
+⸻
+
+Components
+	•	Spring Boot Scheduler
+	•	SFTP Connector
+	•	S3 File Storage Service
+	•	DAO Layer (JPA)
+	•	Kafka Producer
+	•	Acknowledgment File Generator
+	•	Parser Kafka Consumer (in another service)
+
+⸻
+
+Subtasks and Details
+
+1. Create Scheduler Service
+	•	Package: com.project.recon.scheduler
+	•	Class: SftpFileIngestionScheduler.java
+	•	Use @Scheduled(fixedRate = ...) or @Scheduled(cron = "...").
+	•	Fetch configurations (bankCode, paymode, sftp paths) from DB or config file.
+
+⸻
+
+2. Connect to SFTP
+	•	Package: com.project.recon.sftp
+	•	Class: SftpClientService.java
+	•	Use JSch or Apache Commons VFS2 for SFTP.
+	•	Method: List<FileMetadata> listFiles(String sftpPath)
+	•	Method: InputStream downloadFile(String remoteFilePath)
+	•	Method: void deleteFile(String remoteFilePath)
+	•	Method: void uploadAckFile(String path, byte[] content)
+
+⸻
+
+3. Upload File to S3
+	•	Package: com.project.recon.storage
+	•	Class: S3StorageService.java
+	•	Method: String upload(InputStream fileStream, String s3Path, String fileName)
+	•	Store the file using structure like: s3://bucketName/bankcode/paymodecode/date/filename
+
+⸻
+
+4. Insert Record in Database
+	•	Entity: ReconFileSummary.java
+	•	Table: recon_file_summary
+	•	Fields: id, bankCode, fileName, filePath, receivedDate, configId, status, createdAt
+	•	Repository: ReconFileSummaryRepository extends JpaRepository<ReconFileSummary, Long>
+	•	DAO/Service: ReconFileSummaryService.java
+	•	Save record after successful S3 upload.
+
+⸻
+
+5. Produce Kafka Message
+	•	Package: com.project.recon.kafka
+	•	Class: ReconFileKafkaProducer.java
+	•	Method: void sendReconFileSummaryId(Long summaryId)
+	•	Topic: recon-file-topic
+	•	Payload: { "reconFileSummaryId": 123 }
+
+⸻
+
+6. Generate Acknowledgment
+	•	Package: com.project.recon.ack
+	•	Class: AcknowledgmentGeneratorService.java
+	•	Method: byte[] generateAck(String fileName, String status, Instant time)
+	•	Path: /bankcode/paymodecode/date/out
+	•	Upload using SFTP client.
+
+⸻
+
+7. Clean Up Source Files
+	•	After successful acknowledgment and Kafka message send, delete source files from /in.
+
+⸻
+
+Kafka Consumer (Handled Separately)
+	•	Listens to recon-file-topic.
+	•	Fetches ReconFileSummary by ID.
+	•	Pulls parser configuration using configId.
+	•	Invokes parser service:
+	•	POST /parse with file location and config.
+	•	Stores parsed content in the DB.
+
+⸻
+
+Validation & Logs
+	•	Use SLF4J logging for each major step.
+	•	Log:
+	•	File name
+	•	S3 upload status
+	•	DB insertion status
+	•	Kafka message send result
+	•	Ack file creation result
+	•	Handle and log exceptions with retry logic (e.g., Spring Retry or manual fallback).
+
+⸻
+
+Testing
+	•	Unit tests for each service: SFTP, S3, DAO, Kafka.
+	•	Integration test for complete flow using mock SFTP and embedded Kafka.
+
+⸻
+
+Tech Stack
+	•	Spring Boot
+	•	Spring Data JPA
+	•	Amazon S3 SDK
+	•	Kafka (Spring Kafka)
+	•	SFTP (JSch / Apache VFS2)
+	•	Lombok
+	•	PostgreSQL (assumed for DB)
+
+⸻
+
+Acceptance Criteria
+	•	Files from SFTP /in are moved to S3.
+	•	Records are inserted in recon_file_summary.
+	•	Kafka message is published with the summary ID.
+	•	Acknowledgment files are present in /out.
+	•	Original files are removed from SFTP after success.
+
+⸻
+
+Would you like me to help generate the code structure or sample classes/interfaces for this task?
