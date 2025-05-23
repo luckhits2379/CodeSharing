@@ -1,0 +1,143 @@
+Here’s a well-structured GitLab story (issue) tailored for a junior developer. It provides a comprehensive technical breakdown of the task with clear steps and separation of concerns by service, DAO, and repository layers. This will guide the developer through building the Spring Boot scheduler for payout generation after reconciliation.
+
+⸻
+
+GitLab Story: Implement Payout Generation Scheduler After Reconciliation
+
+Title:
+Implement Spring Boot Scheduler for Payout Generation Post-Reconciliation
+
+Assignee: [Junior Developer’s Name]
+
+Labels: backend, scheduler, reconciliation, payout, Spring Boot, Java
+
+⸻
+
+Objective
+
+Develop a scheduled Spring Boot service that processes payout generation for reconciled files, handling business rules for refunds, chargebacks, and multi-account merchant settlements.
+
+⸻
+
+Acceptance Criteria
+	•	Scheduler picks records from RECON_FILE_SUMMARY with recon_status = 'SUCCESS' and payout_status IS NULL.
+	•	For each selected FILE_SUMMARY_ID, process associated records from RECON_FILE_DTLS.
+	•	Validate each ATRN for refund/chargeback logic.
+	•	Generate payout records in MERCHANT_TXN_PAYOUT.
+	•	Handle multi-account logic and update MERCHANT_TXN_MULTI_ACC_PAYOUT.
+	•	Calculate total payout and update MERCHANT_ACCOUNT_PAYOUT.
+	•	Insert liability record if net amount is negative in MERCHANT_LIABILITY.
+	•	Update RECON_FILE_DTLS and RECON_FILE_SUMMARY with payout statuses.
+	•	Ensure proper logging and error handling throughout.
+
+⸻
+
+Technical Implementation Breakdown
+
+⸻
+
+1. Scheduler
+
+Location: scheduler/PayoutGenerationScheduler.java
+	•	Cron-based or fixed-delay scheduler.
+	•	Triggers payout processing service.
+
+⸻
+
+2. Service Layer
+
+Location: service/PayoutProcessingService.java
+	•	Method: processEligibleReconciliations()
+	•	Fetch RECON_FILE_SUMMARY entries with recon_status = 'SUCCESS' and payout_status IS NULL.
+	•	For each FILE_SUMMARY_ID, invoke processFileSummary(String fileSummaryId).
+	•	Method: processFileSummary(String fileSummaryId)
+	•	Fetch RECON_FILE_DTLS entries with reconciliation_status = 'SUCCESS' and payout_status IS NULL.
+	•	For each record:
+	•	Validate ATRN using refund_booking and chargeback_booking.
+	•	If both exist → Mark payout failed in RECON_FILE_DTLS.
+	•	Else → Calculate payout amount:
+	•	Refund case: payout = payment - refund
+	•	Chargeback case: payout = payment - chargeback
+	•	Insert record in MERCHANT_TXN_PAYOUT.
+	•	Handle multi-account logic:
+	•	If no multi-account info, map full amount to primary account.
+	•	Else, distribute amount as per merchant_order_details.
+	•	Insert records in MERCHANT_TXN_MULTI_ACC_PAYOUT.
+	•	Calculate total payout:
+	•	If negative, insert in MERCHANT_LIABILITY, skip payout.
+	•	If positive, aggregate by bank account and insert in MERCHANT_ACCOUNT_PAYOUT.
+	•	Update RECON_FILE_SUMMARY and RECON_FILE_DTLS payout statuses.
+
+⸻
+
+3. DAO Layer
+
+Location: dao/PayoutProcessingDao.java
+	•	List<FileSummary> findEligibleFileSummaries();
+	•	List<ReconDetail> findReconDetailsByFileSummaryId(String fileSummaryId);
+	•	List<Refund> findRefundsByAtrn(String atrn);
+	•	List<Chargeback> findChargebacksByAtrn(String atrn);
+	•	MerchantOrder findMerchantOrderByAtrn(String atrn);
+	•	List<MerchantOrderDetail> findMultiAccountDetailsByAtrn(String atrn);
+	•	void insertMerchantTxnPayout(...);
+	•	void insertMerchantTxnMultiAccountPayout(...);
+	•	void insertMerchantAccountPayout(...);
+	•	void insertMerchantLiability(...);
+	•	void updateReconDetailPayoutStatus(...);
+	•	void updateFileSummaryPayoutStatus(...);
+
+⸻
+
+4. Repository Layer
+
+Location: repository/ (Standard Spring Data JPA Repositories)
+	•	ReconFileSummaryRepository
+	•	ReconFileDetailsRepository
+	•	RefundBookingRepository
+	•	ChargebackBookingRepository
+	•	MerchantOrderRepository
+	•	MerchantOrderDetailsRepository
+	•	MerchantTxnPayoutRepository
+	•	MerchantTxnMultiAccPayoutRepository
+	•	MerchantAccountPayoutRepository
+	•	MerchantLiabilityRepository
+
+⸻
+
+Database Tables Involved
+	•	RECON_FILE_SUMMARY
+	•	RECON_FILE_DTLS
+	•	REFUND_BOOKING
+	•	CHARGEBACK_BOOKING
+	•	MERCHANT_ORDER
+	•	MERCHANT_ORDER_DETAILS
+	•	MERCHANT_TXN_PAYOUT
+	•	MERCHANT_TXN_MULTI_ACC_PAYOUT
+	•	MERCHANT_ACCOUNT_PAYOUT
+	•	MERCHANT_LIABILITY
+
+⸻
+
+Logging & Error Handling
+	•	Log start and completion of each stage.
+	•	Log errors and exceptions with file_summary_id and atrn.
+	•	Use @Transactional for consistency.
+
+⸻
+
+Testing Notes
+	•	Write unit tests for PayoutProcessingService.
+	•	Mock DAO responses.
+	•	Validate output records for sample inputs.
+
+⸻
+
+Definition of Done
+	•	Code merged into main branch.
+	•	Unit tests passing.
+	•	Scheduler tested in dev environment with sample data.
+	•	Code reviewed and approved.
+
+⸻
+
+Would you like me to generate code templates for the scheduler, service, or DAOs as well?
