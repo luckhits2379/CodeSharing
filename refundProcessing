@@ -1,0 +1,150 @@
+Here’s a detailed GitLab story written for junior developers to implement the Refund Orchestration Module. This story includes the scheduler, service structure, DAO, repository, Kafka integration, and error-handling logic, broken down in an understandable format.
+
+⸻
+
+Title: Refund Orchestration Module – Paymode & Channel Bank-wise Refund Processing
+
+⸻
+
+Epic: SBIePay Refund Workflow Integration
+
+Story Points: 8
+Assignee: [Developer Name]
+Labels: scheduler, kafka, refund, api, sftp, spring-boot
+
+⸻
+
+Objective:
+
+Develop a scheduled refund processing module that triggers paymode-wise and channel bank-wise. It will either invoke a refund API or generate a refund file based on configuration, handle retries, track statuses, and interact with Kafka for status publishing.
+
+⸻
+
+Technical Overview:
+
+1. Module Responsibility
+	•	Process refund for one paymode + one channel bank at a time.
+	•	Fetch all eligible refund records.
+	•	Based on configuration:
+	•	Call Refund API via WebClient
+	•	OR generate refund CSV file and upload it to SFTP
+	•	Track success/failure
+	•	Retry up to 3 times if refund fails.
+	•	Update statuses and publish results to Kafka.
+
+⸻
+
+Flow Steps:
+
+✅ Scheduler:
+	•	Cron job to run at configured intervals.
+	•	For each job run:
+	•	Accept Paymode & Channel Bank as input.
+	•	Trigger refund processing for given paymode + channel bank.
+
+✅ Fetch Refund Records:
+	•	From refund_booking table.
+	•	Conditions:
+	•	refund_status in ("Refund Booked", "Cancellation_Booked")
+	•	refund_retry > 0
+
+✅ Refund Processing Logic:
+	•	Based on configuration (refund_mode_config table or service):
+	•	If API Mode:
+	•	Call Refund API via WebClient
+	•	Parse response → mark REFUND_PROCESSED on success
+	•	If File Mode:
+	•	Create Refund CSV
+	•	Upload to SFTP
+	•	Mark REFUND_PROCESSED on successful upload
+
+✅ Retry Logic:
+	•	Maintain refund_retry (int, default 3) in refund_booking.
+	•	On failure, decrement refund_retry by 1.
+	•	Only fetch and retry records with refund_retry > 0.
+
+✅ Chargeback Scenario:
+	•	If chargeback_amount > 0:
+	•	Check: refund_amount <= (total_amount - chargeback_amount)
+	•	If not, mark as REFUND_FAILED with remark: Exceeds Refundable Limit.
+
+✅ Kafka Integration:
+	•	After each refund processing (success or failure):
+	•	Publish message to Kafka topic: refund-processing-status
+	•	Payload:
+
+{
+  "arrn": "ARRN12345",
+  "refundStatus": "REFUND_PROCESSED",
+  "remark": "Processed via API" // or "Failed due to ...",
+  "channelBank": "XYZ",
+  "paymode": "UPI"
+}
+
+
+
+✅ Transaction Service Consumer:
+	•	Listens to refund-processing-status topic.
+	•	Updates transaction status accordingly.
+
+⸻
+
+Database Changes:
+
+refund_booking Table:
+
+Column Name	Type	Description
+refund_retry	INT	Default 3, decremented on each failure
+refund_status	TEXT	Tracks processing status
+remark	TEXT	Optional remarks for failures/success
+
+
+⸻
+
+Required Components:
+
+✅ Service Layers:
+	•	RefundSchedulerService
+	•	RefundProcessorService
+	•	RefundFileGeneratorService
+	•	RefundAPIClientService
+	•	KafkaRefundPublisherService
+
+✅ DAO & Repository:
+	•	RefundBookingRepository – to fetch/update refund records
+	•	RefundConfigRepository – to fetch refund mode config
+	•	TransactionStatusUpdater (consumer microservice)
+
+✅ Kafka Topic:
+	•	refund-processing-status
+
+⸻
+
+Exception Scenarios to Handle:
+
+Scenario	Action Taken
+Refund API fails	Decrement retry, log error
+File Upload fails on SFTP	Decrement retry, log error
+Invalid refund amount (Chargeback)	Mark as REFUND_FAILED, add remark
+Retry Exhausted	Mark as REFUND_FAILED, log
+
+
+⸻
+
+Testing Notes:
+	•	Unit tests for service logic and retry.
+	•	Integration test for end-to-end flow (mock API + SFTP).
+	•	Kafka message publishing verification.
+
+⸻
+
+Acceptance Criteria:
+	•	Refunds processed successfully via configured mode.
+	•	Retry logic works and capped at 3 attempts.
+	•	Kafka message published for each refund attempt.
+	•	Chargeback logic correctly restricts refunds.
+	•	Refund statuses accurately updated.
+
+⸻
+
+Let me know if you need this story broken down into subtasks or documented in .md format for GitLab wiki.
